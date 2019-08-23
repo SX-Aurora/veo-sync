@@ -123,9 +123,23 @@ veo_barrier_destroy(b);
 
 ## Synchronizing a thread context
 
+Collect all results from a context, ignore their value and return the
+worst return code.
+
 ```c
 int veo_sync_context(struct veo_thr_ctxt *ctx);
 ```
+
+The function collects results until it encounters a VEO_COMMAND_ERROR
+which means that it did not find the request. If you do
+`veo_call_wait_result()` for some request in the middle of a series of
+requests, then `veo_sync_context()` will stop there and not collect
+the results of the older request, leaving them in the results queue.
+
+VEO is not able to report which requests are still in the queue and
+which not. This call is a little hack to emulate CUDA stream
+synchronization, but needs to be used with care. We plan to enhance it
+once VEO gets better methods of introspection.
 
 
 ## TID of a context thread
