@@ -16,29 +16,25 @@
 /*
  * barrier helper function, submitted as VH function to a context queue
  */
-static int64_t _veo_barrier_func(void *data, size_t len)
+static uint64_t _veo_barrier_func(void *data)
 {
-	int rc;
+	int rc = -1;
 	struct _veo_barrier_args *ba = (struct _veo_barrier_args *)data;
 
-	if (len != sizeof(struct _veo_barrier_args)) {
-		return -EINVAL;
-	}
-	rc = -1;
 	while (rc == -1)
 		rc = __atomic_fetch_add(ba->num_blocked, 1, __ATOMIC_SEQ_CST);
 	rc = pthread_barrier_wait(ba->barrier);
 	if (rc == 0 || rc == PTHREAD_BARRIER_SERIAL_THREAD)
 		return 0;
-	return (int64_t)rc;
+	return (uint64_t)rc;
 }
 
 /*
  * VH function returning the thread ID of a context thread
  */
-static int64_t _veo_get_ctxt_tid(void *data, size_t len)
+static uint64_t _veo_get_ctxt_tid(void *data)
 {
-	return (int64_t)syscall(SYS_gettid);
+	return (uint64_t)syscall(SYS_gettid);
 }
 
 /*
@@ -130,7 +126,7 @@ int veo_barrier_set(struct veo_barrier *vb)
 
 	for (i = 0; i < vb->num_ctxts; i++) {
 		uint64_t req = veo_call_async_vh(vb->rr[i].ctx, &_veo_barrier_func,
-						 &vb->ba, sizeof(vb->ba));
+						 &vb->ba);
 		// TODO: what if some submission fails?
 		if (req == VEO_REQUEST_ID_INVALID) {
 			printf("ERROR: submitting request in veo_barrier_set failed!\n");
@@ -229,7 +225,7 @@ int64_t veo_context_tid(struct veo_thr_ctxt *ctx)
 	uint64_t req;
 	int64_t result;
 
-	req = veo_call_async_vh(ctx, &_veo_get_ctxt_tid, NULL, 0);
+	req = veo_call_async_vh(ctx, &_veo_get_ctxt_tid, NULL);
 	if (req == VEO_REQUEST_ID_INVALID) {
 		printf("ERROR: failed to submit request in %s\n", __func__);
 		return -EINVAL;
@@ -254,7 +250,7 @@ int veo_sync_context(struct veo_thr_ctxt *ctx)
 	int rc, rcmax = 0;
 	uint64_t result, req;
 
-	req = veo_call_async_vh(ctx, &_veo_get_ctxt_tid, NULL, 0);
+	req = veo_call_async_vh(ctx, &_veo_get_ctxt_tid, NULL);
 	if (req == VEO_REQUEST_ID_INVALID) {
 		printf("ERROR: failed to submit request in %s\n", __func__);
 		return -EINVAL;
